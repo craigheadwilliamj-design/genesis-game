@@ -2746,6 +2746,22 @@ const SPRITE_HIT = {
   "lweed":[24,28,10,11,"4-18,2-20,4-22,3-23,3-23,3-22,2-21"],
 };
 // SPRITE_HIT:end
+// Genesis buildings drawn as one picture per view (sprites/bld/<name>-<front|back|left|right>.png at ROCK_MPP), picked by where the door looks: down the screen front, up back, left or right the side with the door at that end. w x h is the picture in px, base the row under its base slab (the shadow rows below it hang past the footprint's front edge; sideBase for the left and right pictures, when it differs). A pixel is square on screen after the squash. views lists the pictures drawn so far when some are missing; the rest fall back to the front. frames: an animation, <name>-<view>-2.png etc., cycling at 3 a second, one shown at a time.
+// Restroom: the front and back walls are 61 px (the 8 m door wall), the side pictures' 46 px (the turned 6 m front), the roof overhangs. Food and gift carts: the vendor shifting behind the counter; its side pictures sit two rows lower in the frame (sideBase), the right one the left mirrored.
+// card: the pictures are flat, with no roof depth drawn. backOver: meters of the box's back (north) side that may lie over a path (pathSolid, pathcells.js), so a cart can back a little onto one; the back view is drawn that much higher in its box to meet it, and facing north the cart snaps its base line to the grid, not its door wall (doorOnGrid). hit: the picture's opaque box per view [x0, y0, x1, y1] in px, tappable on top of the footprint.
+const BLD_PICS = {restroom:{w:80, h:80, base:71}, kiosk:{w:40, h:40, base:36, sideBase:38, frames:2, card:true, backOver:.6,
+  hit:{front:[2, 1, 37, 36], back:[2, 1, 37, 36], left:[6, 0, 33, 38], right:[7, 0, 34, 38]}}};
+BLD_PICS.cart = BLD_PICS.kiosk;   // the gift cart is the food cart in pink with a GIFT sign
+// Genesis path objects drawn as pictures in the restroom's style (sprites/bld/<type>-<front|back|left|right>[-full|-broken].png, made by tools/pixelbin.py and tools/pixelbench.py), picked by where the item's front looks.
+// Each view is [width, height, front, row]: the picture is centered across, and the bottom of its base (`row`, else the third row from the bottom, above the 2 shadow rows) sits `front` m in front of the middle, scaled by k like the drawn props.
+// A state with its own size (a knocked-over bin is wider) has its own entry, "<view>-<state>"; a view with no picture of its own (the lamp's back and sides) shows the front.
+// A bench's end-on views cheat the projection (its end profile with a short top, not two tall strips running back), standing in the middle of the footprint.
+const PROP_PICS = {
+  bin:{front:[14, 21, .45], back:[14, 21, .45], left:[14, 21, .45], right:[14, 21, .45]},
+  bench:{front:[26, 16, .5], back:[26, 12, .5], left:[12, 15, .5], right:[12, 15, .5]},
+  lamp:{front:[13, 32, .6, 31]},
+};
+for(const v of ["front", "back", "left", "right"]) PROP_PICS.bin[v + "-broken"] = [21, 21, .45];
 // Ground footprint of a plant, rock or boulder (landscape.js footBox, footRects). A plant takes a square of whole 1 m cells, or in FOOT.rect a base width by a share of it deep; a pictured rock or boulder takes a few
 // whole-cell rects cut from its silhouette (SPRITE_HIT, ROCK_FOOT in landscape.js). All stand on the picture's base and run back up the map. A plant's side comes from its own sprite, rounded to whole meters and held to its kind's range.
 // side: key -> meters, to override one picture by hand with a square.

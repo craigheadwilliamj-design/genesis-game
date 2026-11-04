@@ -4290,66 +4290,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   }));
 
-  // pixel editor (dev mode): strips open as frames, tools draw, the strip saves at full width, and "Try in park" swaps the picture
-  const coelRig = require("fs").readFileSync(path.resolve(__dirname, "../tools/rigger/coelophysis/coelophysis-clips.json"), "utf8");
-  Object.assign(checks, await page.evaluate(async require_coel => {
-    const out = {}, was = SPRITE_PACK["sprites/dime-walk.png"];
-    out.pixelBtnDevOnly = document.querySelector("#pixelBtn").hidden === !devMode();
-    await openPixelEditor("sprites/dime-walk.png");
-    out.pixelStripFrames = px.frames.length === 4 && px.fw === 100 && px.fh === 75 && pxGuess("sprites/human/keeper-walk.png", 64, 32) === 4 && pxGuess("sprites/bld/restroom-front.png", 80, 80) === 1;
-    pxNew("sprites/smoke/test.png", 10, 8, 2); px.mirror = true; px.tool = "pencil"; px.c1 = [10, 20, 30, 255];
-    px.stroke = {a:[1, 1], last:[1, 1], ink:px.c1, base:pxFrame().slice(), done:new Set()}; pxMoveTo(3, 1, {}); px.stroke = null; px.mirror = false;
-    out.pixelPencilMirror = [1, 2, 3, 6, 7, 8].every(x => pxGet(pxFrame(), x, 1)[3] === 255) && pxGet(pxFrame(), 4, 1)[3] === 0;
-    pxPush(); pxFill(pxFrame(), 0, 5, [1, 2, 3, 255], false); const filled = pxGet(pxFrame(), 9, 7)[0] === 1; pxUndo(false);
-    out.pixelFillUndo = filled && pxGet(pxFrame(), 9, 7)[3] === 0;
-    const im = await pxImg(pxPng()); out.pixelPngIsStrip = im.width === 20 && im.height === 8;
-    // layers: every frame gets the new layer, the strip shows them stacked, a hidden one drops out, merge down and undo
-    pxLayerOp("add"); pxPut(pxFrame(), 1, 1, [200, 0, 0, 255]);
-    const stacked = px.frames.every(f => f.length === 2) && pxGet(pxCompData(0), 1, 1)[0] === 200;
-    px.layers[1].show = false; const hid = pxGet(pxCompData(0), 1, 1).join() === "10,20,30,255"; px.layers[1].show = true;
-    px.layers[1].alpha = .5; pxLayerOp("merge"); const merged = px.layers.length === 1 && pxGet(px.frames[0][0], 1, 1)[0] === 105; pxUndo(false);
-    // the rigger: layers out as full-cell parts (empty ones skipped), and a rigger project back in as layers at their rest-pose places
-    const rig = pxRigFile(), coel = JSON.parse(require_coel);
-    await pxFromRigger(coel, "coel.json");
-    out.pixelRigger = rig.nodes.length === 2 && rig.cell.w === 10 && Object.keys(rig.assets).length === 2 && px.layers.length === coel.nodes.length && px.fw === coel.cell.w && px.frames.length === 1
-      && px.layers[0].name === coel.nodes[0].name && pxCompData(0).some((v, i) => i % 4 === 3 && v);
-    pxUndo(false);
-    // the reference: an upload fits inside the canvas whole on the bottom middle, and stays out of the picture
-    const rc = document.createElement("canvas"); rc.width = 400; rc.height = 100; rc.getContext("2d").fillRect(0, 0, 400, 100);
-    const pngNoRef = pxPng(); px.refUrl = rc.toDataURL(); await pxSetRef("upload"); const refB = pxRefBox();
-    out.pixelReference = refB[2] === px.fw && Math.abs(refB[3] - px.fw / 4) < 1e-9 && refB[1] + refB[3] === px.fh && refB[0] === 0 && pxDraft().ref.path === "upload" && pxPng() === pngNoRef;
-    // To layer: a 6x4 pixel-art picture blown up 5x with a 2 px margin, matched 1:1 and copied in, comes back as its 24 pixels and 4 colors
-    const art = [[200, 40, 40], [40, 160, 60], [30, 30, 120], [230, 200, 90]], ac = document.createElement("canvas"); ac.width = 34; ac.height = 24; const actx = ac.getContext("2d");
-    for(let y = 0; y < 4; y++) for(let x = 0; x < 6; x++){ actx.fillStyle = `rgb(${art[(x * 3 + y) % 4]})`; actx.fillRect(2 + x * 5, 2 + y * 5, 5, 5); }
-    px.refUrl = ac.toDataURL(); await pxSetRef("upload"); const grid = pxRefGrid(); pxRefMatch(); const layN = px.layers.length; pxRefToLayer();
-    const got = px.frames[px.cur][px.layers.length - 1], gotC = new Set(); let gotN = 0; for(let i = 0; i < got.length; i += 4) if(got[i + 3]){ gotN++; gotC.add(got.slice(i, i + 3).join()); }
-    out.pixelRefToLayer = grid.s === 5 && grid.ox === 2 && px.layers.length === layN + 1 && gotN === 24 && gotC.size === 4 && art.every(c => gotC.has(c.join()));
-    pxUndo(false);
-    await pxSetRef(""); px.refUrl = "";
-    pxTool("pan"); out.pixelPanTool = pxPans({button:0}) && pxPans({button:1}) && pxCv.style.cursor === "grab" && !!document.querySelector('#dlgPixel [data-tool="pan"]'); pxTool("pencil");
-    // the lasso snaps to pixels: a triangle's ring and inside, and copy and paste keep its shape
-    const tri = pxLassoSel([[0, 0], [6, 0], [0, 6]]); let triN = 0; tri.mask.forEach(v => triN += v);
-    px.sel = tri; pxCopy(false); const pasteBefore = px.undo.length; pxPaste();
-    out.pixelLasso = tri.w === 7 && tri.h === 7 && triN === 28 && tri.mask[6] === 1 && tri.mask[7 * 6 + 6] === 0 && pxInSel(tri, 1, 1) && !pxInSel(tri, 6, 6) && !pxLassoSel([[2, 2]])
-      && !!px.sel.mask && px.sel.buf.length === 7 * 7 * 4 && px.undo.length === pasteBefore + 1 && pxSig(2, 1, new Uint8ClampedArray([1, 2, 3, 255, 0, 0, 0, 0])) === pxSig(2, 1, new Uint8ClampedArray([1, 2, 3, 255, 9, 9, 9, 0]));
-    px.sel = null; pxUndo(false);
-    out.pixelLayers = stacked && hid && merged && px.layers.length === 2 && pxDraft().layers.length === 2;
-    const before = spriteUrl("sprites/dime-walk.png"); px.path = "sprites/dime-walk.png"; pxTry();
-    out.pixelTryInPark = SPRITE_PACK["sprites/dime-walk.png"] !== was && spriteUrl("sprites/dime-walk.png") !== before;
-    const need = pxNeedArt()[0].id; pxNew(`sprites/${need}-walk.png`, 100, 75, 4); pxTry();
-    out.pixelNewSpeciesTry = SPRITES[need].tried === 1 && SPRITES[need].walk === 4 && !!SPRITE_PACK[`sprites/${need}.png`] && pxNeedArt().some(x => x.id === need);
-    delete SPRITES[need]; delete SPRITE_PACK[`sprites/${need}.png`]; delete SPRITE_PACK[`sprites/${need}-walk.png`]; try{ localStorage.removeItem(`genesis-pixel-d:sprites/${need}-walk.png`); localStorage.removeItem("genesis-pixel-drafts"); }catch{}
-    // plants, buildings, props and rocks: each kind still missing a picture is listed, and Try gives it a stand-in entry with its own picture
-    const nd = ["plant", "bld", "rock"].map(c => pxNeeds(c)), pk = nd[0][0], bk = nd[1].find(x => !BUILDINGS[x.opt.name].prop), rkk = nd[2][0], keep = JSON.stringify([PLANT_SPRITES[pk.opt.name], BLD_PICS[bk.opt.name], ROCK_SPRITES]);
-    const tryOne = x => { pxNew(x.path, x.opt.w || PX_TEMPLATES[x.opt.tpl][1], x.opt.h || PX_TEMPLATES[x.opt.tpl][2], 1); pxPut(pxFrame(), 2, px.fh - 2, [9, 9, 9, 255]); pxTry(); };
-    [pk, bk, rkk].forEach(tryOne);
-    const [rt, rb] = rkk.opt.name.split("-");
-    out.pixelNewLandAndBuildings = nd.every(l => l.length) && PLANT_SPRITES[pk.opt.name].tried === 1 && !!SPRITE_HIT[pk.opt.name] && BLD_PICS[bk.opt.name].tried === 1 && BLD_PICS[bk.opt.name].base === bk.opt.h - 9
-      && ROCK_SPRITES[rb][rt].length === +rkk.opt.name.split("-")[2] && pxGuideFor("sprites/bld/restroom-left.png") === BLD_PICS.restroom.base;
-    delete PLANT_SPRITES[pk.opt.name]; delete BLD_PICS[bk.opt.name]; ROCK_SPRITES[rb][rt].pop(); void keep;
-    [pk, bk, rkk].forEach(x => { try{ localStorage.removeItem("genesis-pixel-d:" + x.path); }catch{} });
-    spriteUrl.swap("sprites/dime-walk.png", was); px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
-    document.querySelector("#dlgPixel").close();
+  Object.assign(checks, await page.evaluate(async () => {
+    const out = {};
     // pools: sea water costs more, pool animals want an open exhibit mostly under sea water (deep for deep ones, any water for fresh ones), room is water,
     // no plants, thirst, cover or escapes; they spawn in and swim only in their water; galleries stand on park ground and beat a platform's view
     {
@@ -4441,14 +4383,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       }
       state.exhibits = keepEx; state.buildings = keepB; state.money = m0; render();
     }
-    // turning dev mode on shows Pixels straight away, with no reload, even where storage is blocked
+    // turning dev mode on shows Px (save the old pixel drafts to a file) straight away, with no reload, and only while there are drafts
     openParkOffice("menu");   // the version label lives at the foot of the Main Menu
     const wasDev = devMode(), tap = () => { for(let i = 0; i < 5; i++) document.querySelector("#verLabel").click(); };
+    localStorage.setItem("genesis-pixel-d:sprites/smoke/old.png", "{}");
     if(wasDev) tap(); tap(); const shown = !document.querySelector("#pixelBtn").hidden && devMode(); tap();
-    out.pixelBtnNoReload = shown && document.querySelector("#pixelBtn").hidden && !devMode();
+    const off = document.querySelector("#pixelBtn").hidden && !devMode(); localStorage.removeItem("genesis-pixel-d:sprites/smoke/old.png"); tap();
+    out.pixelDraftsBtn = shown && off && document.querySelector("#pixelBtn").hidden && devMode() && !document.querySelector("#dlgPixel") && typeof openPixelEditor === "undefined"; tap();
     devFlag = null; try{ if(wasDev) localStorage.setItem("genesis-dev", "1"); }catch{}
     return out;
-  }, coelRig));
+  }));
 
   // The power grid: stations and transformers feed what they reach, cables join them, shortages cut the least important first, and guests notice
   Object.assign(checks, await page.evaluate(() => {
@@ -4534,6 +4478,71 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     select(null);
     return out;
   }));
+
+  // pixel editor (pixeled.html, its own page): strips open as frames, tools draw, the strip saves at full width, layers, the rigger, the reference, the lasso, drafts from the game
+  {
+    const coelRig = require("fs").readFileSync(path.resolve(__dirname, "../tools/rigger/coelophysis/coelophysis-clips.json"), "utf8");
+    const pe = await browser.newPage();
+    pe.on("pageerror", e => errors.push("pixeled.html: " + String(e.stack||e)));
+    pe.on("console", m => { if(m.type() === "error" && !/ERR_CERT|net::/.test(m.text())) errors.push("pixeled.html: " + m.text()); });
+    await pe.goto("file://" + path.resolve(__dirname, "../pixeled.html"));
+    await pe.waitForTimeout(300);
+    Object.assign(checks, await pe.evaluate(async require_coel => {
+    const out = {}, D = document.querySelector("#dlgPixel");
+    D.dispatchEvent(new Event("cancel", {cancelable:true})); out.pixelOpensOnLoad = D.open;   // Escape never closes the page's editor
+    await openPixelEditor("sprites/dime-walk.png");
+    out.pixelStripFrames = px.frames.length === 4 && px.fw === 100 && px.fh === 75 && pxGuess("sprites/human/keeper-walk.png", 64, 32) === 4 && pxGuess("sprites/bld/restroom-front.png", 80, 80) === 1;
+    pxNew("sprites/smoke/test.png", 10, 8, 2); px.mirror = true; px.tool = "pencil"; px.c1 = [10, 20, 30, 255];
+    px.stroke = {a:[1, 1], last:[1, 1], ink:px.c1, base:pxFrame().slice(), done:new Set()}; pxMoveTo(3, 1, {}); px.stroke = null; px.mirror = false;
+    out.pixelPencilMirror = [1, 2, 3, 6, 7, 8].every(x => pxGet(pxFrame(), x, 1)[3] === 255) && pxGet(pxFrame(), 4, 1)[3] === 0;
+    pxPush(); pxFill(pxFrame(), 0, 5, [1, 2, 3, 255], false); const filled = pxGet(pxFrame(), 9, 7)[0] === 1; pxUndo(false);
+    out.pixelFillUndo = filled && pxGet(pxFrame(), 9, 7)[3] === 0;
+    const im = await pxImg(pxPng()); out.pixelPngIsStrip = im.width === 20 && im.height === 8;
+    // layers: every frame gets the new layer, the strip shows them stacked, a hidden one drops out, merge down and undo
+    pxLayerOp("add"); pxPut(pxFrame(), 1, 1, [200, 0, 0, 255]);
+    const stacked = px.frames.every(f => f.length === 2) && pxGet(pxCompData(0), 1, 1)[0] === 200;
+    px.layers[1].show = false; const hid = pxGet(pxCompData(0), 1, 1).join() === "10,20,30,255"; px.layers[1].show = true;
+    px.layers[1].alpha = .5; pxLayerOp("merge"); const merged = px.layers.length === 1 && pxGet(px.frames[0][0], 1, 1)[0] === 105; pxUndo(false);
+    // the rigger: layers out as full-cell parts (empty ones skipped), and a rigger project back in as layers at their rest-pose places
+    const rig = pxRigFile(), coel = JSON.parse(require_coel);
+    await pxFromRigger(coel, "coel.json");
+    out.pixelRigger = rig.nodes.length === 2 && rig.cell.w === 10 && Object.keys(rig.assets).length === 2 && px.layers.length === coel.nodes.length && px.fw === coel.cell.w && px.frames.length === 1
+      && px.layers[0].name === coel.nodes[0].name && pxCompData(0).some((v, i) => i % 4 === 3 && v);
+    pxUndo(false);
+    // the reference: an upload fits inside the canvas whole on the bottom middle, and stays out of the picture
+    const rc = document.createElement("canvas"); rc.width = 400; rc.height = 100; rc.getContext("2d").fillRect(0, 0, 400, 100);
+    const pngNoRef = pxPng(); px.refUrl = rc.toDataURL(); await pxSetRef("upload"); const refB = pxRefBox();
+    out.pixelReference = refB[2] === px.fw && Math.abs(refB[3] - px.fw / 4) < 1e-9 && refB[1] + refB[3] === px.fh && refB[0] === 0 && pxDraft().ref.path === "upload" && pxPng() === pngNoRef;
+    // To layer: a 6x4 pixel-art picture blown up 5x with a 2 px margin, matched 1:1 and copied in, comes back as its 24 pixels and 4 colors
+    const art = [[200, 40, 40], [40, 160, 60], [30, 30, 120], [230, 200, 90]], ac = document.createElement("canvas"); ac.width = 34; ac.height = 24; const actx = ac.getContext("2d");
+    for(let y = 0; y < 4; y++) for(let x = 0; x < 6; x++){ actx.fillStyle = `rgb(${art[(x * 3 + y) % 4]})`; actx.fillRect(2 + x * 5, 2 + y * 5, 5, 5); }
+    px.refUrl = ac.toDataURL(); await pxSetRef("upload"); const grid = pxRefGrid(); pxRefMatch(); const layN = px.layers.length; pxRefToLayer();
+    const got = px.frames[px.cur][px.layers.length - 1], gotC = new Set(); let gotN = 0; for(let i = 0; i < got.length; i += 4) if(got[i + 3]){ gotN++; gotC.add(got.slice(i, i + 3).join()); }
+    out.pixelRefToLayer = grid.s === 5 && grid.ox === 2 && px.layers.length === layN + 1 && gotN === 24 && gotC.size === 4 && art.every(c => gotC.has(c.join()));
+    pxUndo(false);
+    await pxSetRef(""); px.refUrl = "";
+    pxTool("pan"); out.pixelPanTool = pxPans({button:0}) && pxPans({button:1}) && pxCv.style.cursor === "grab" && !!document.querySelector('#dlgPixel [data-tool="pan"]'); pxTool("pencil");
+    // the lasso snaps to pixels: a triangle's ring and inside, and copy and paste keep its shape
+    const tri = pxLassoSel([[0, 0], [6, 0], [0, 6]]); let triN = 0; tri.mask.forEach(v => triN += v);
+    px.sel = tri; pxCopy(false); const pasteBefore = px.undo.length; pxPaste();
+    out.pixelLasso = tri.w === 7 && tri.h === 7 && triN === 28 && tri.mask[6] === 1 && tri.mask[7 * 6 + 6] === 0 && pxInSel(tri, 1, 1) && !pxInSel(tri, 6, 6) && !pxLassoSel([[2, 2]])
+      && !!px.sel.mask && px.sel.buf.length === 7 * 7 * 4 && px.undo.length === pasteBefore + 1 && pxSig(2, 1, new Uint8ClampedArray([1, 2, 3, 255, 0, 0, 0, 0])) === pxSig(2, 1, new Uint8ClampedArray([1, 2, 3, 255, 9, 9, 9, 0]));
+    px.sel = null; pxUndo(false);
+    out.pixelLayers = stacked && hid && merged && px.layers.length === 2 && pxDraft().layers.length === 2;
+    // plants, buildings and rocks still missing a picture are listed; a building view's guide stands on its BLD_PICS row
+    const nd = ["plant", "bld", "rock"].map(c => pxNeeds(c));
+    out.pixelNeedsArt = nd.every(l => l.length) && pxNeedArt().length > 0 && pxGuideFor("sprites/bld/restroom-left.png") === BLD_PICS.restroom.base && pxGuideFor("sprites/bld/lamp-front.png") === PROP_PICS.lamp.front[3];
+    // drafts saved from the game come in through Import, and never over a newer draft here
+    const dkey = "genesis-pixel-d:sprites/smoke/moved.png", dr = JSON.stringify({w:4, h:4, n:1});
+    pxTakeDrafts({genesisPixelDrafts:1, drafts:{"sprites/smoke/moved.png":5}, keys:{[dkey]:dr}}); const took = localStorage.getItem(dkey) === dr && pxDrafts()["sprites/smoke/moved.png"] === 5;
+    pxTakeDrafts({genesisPixelDrafts:1, drafts:{"sprites/smoke/moved.png":4}, keys:{[dkey]:"old"}});
+    out.pixelTakeDrafts = took && localStorage.getItem(dkey) === dr;
+    localStorage.removeItem(dkey); { const d = pxDrafts(); delete d["sprites/smoke/moved.png"]; pxStore("drafts", d); }
+    px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
+    return out;
+    }, coelRig));
+    await pe.close();
+  }
 
   await page.waitForTimeout(800);
   let ok = true;

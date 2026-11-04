@@ -1,4 +1,4 @@
-// Pixel editor (dev mode, HUD "Pixels"): draw and animate any sprite in SPRITE_PACK, try it in the park, send it to the repo.
+// Pixel editor (pixeled.html, its own artifact, not part of the game): draw and animate any sprite in SPRITE_PACK, send it to the repo.
 // A picture is a strip of same-size frames side by side, as the game draws them, made of layers shared by every frame (px.frames[frame][layer]). Work is kept as a localStorage draft per path
 // until "Send to repo" writes the PNG to the db collection `pixeled`, where tools/pixeledpull.py picks it up (docs/art.md: Pixel editor).
 
@@ -147,7 +147,7 @@ function pxSetBase(row){
   if(!(px.path in pxBaseOrig)) pxBaseOrig[px.path] = px.guide; px.guide = row;
   const B = BLD_PICS[k], P = PROP_PICS[k];
   if(BUILDINGS[k].prop){ if(P && P[v]) P[v][3] = row; }
-  else if(B){ if(side && !B.tried) B.sideBase = row; else B.base = row; }
+  else if(B){ if(side) B.sideBase = row; else B.base = row; }
 }
 const pxBaseDiff = () => px.path in pxBaseOrig && px.guide !== pxBaseOrig[px.path] ? px.guide : null;
 function pxFootEnds(){ const gw = Math.round(Math.min(px.fw, px.guideW || px.fw)), x0 = Math.round((px.fw - gw) / 2); return [x0, x0 + gw]; }
@@ -212,13 +212,13 @@ function pxSaveNow(){   // the Save button: the draft saves itself anyway, this 
   const why = pxEmptyWhy(); ui.toast(why ? "Saved, but " + why[0].toLowerCase() + why.slice(1) : `Saved ${px.path}.`, why ? "bad" : "good");
 }
 function pxSaveDraft(){
-  clearTimeout(pxSaveT); if(!px.path) return;
+  clearTimeout(pxSaveT); pxSaveT = 0; if(!px.path) return;
   const d = pxDrafts(); d[px.path] = Date.now(); pxStore("drafts", d); pxStore("last", px.path);
   pxStore("d:" + px.path, pxDraft());
 }
 function pxDelDraft(path){   // the Open list's ×: forget a draft for good
   askConfirm("Delete draft?", `Delete your draft of ${path}? This can't be undone.`, "Delete", () => {
-    if(px.path === path) clearTimeout(pxSaveT);
+    if(px.path === path){ clearTimeout(pxSaveT); pxSaveT = 0; }
     const d = pxDrafts(); delete d[path]; pxStore("drafts", d); pxStore("d:" + path); delete pxGameEq[path];
     if(pxStored("last") === path) pxStore("last");
     if(px.path === path){
@@ -572,78 +572,13 @@ function pxCursor(t){
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 8 8, crosshair`;
 }
 
-/* ---------- park and repo ---------- */
-// Show the picture in the running park until reload (spriteUrl.swap, then every drawn copy re-pointed)
-function pxTry(){
-  if(!px.path || !spriteUrl.swap) return;
-  spriteUrl.swap(px.path, pxPng());
-  // a species with no picture yet gets a stand-in SPRITES entry, so its animals draw from this one right away
-  const m = px.path.match(/^sprites\/([a-z0-9]+)(?:-(walk|idle))?\.png$/), id = m && SPECIES_BY_ID[m[1]] && m[1];
-  if(id && (!SPRITES[id] || SPRITES[id].tried)){
-    const S = SPRITES[id] || (SPRITES[id] = {ratio:px.fw / px.fh, tried:1}), base = `sprites/${id}.png`;
-    if(m[2]){ S[m[2]] = px.frames.length; if(m[2] === "idle") S.ms = Math.round(1000 / px.fps); }
-    if(m[2] && !SPRITE_PACK[base]) spriteUrl.swap(base, pxFirst());
-  }
-  pxTryLand(); pxTryBld();
-  const u = spriteUrl(px.path);
-  document.querySelectorAll("image, img").forEach(el => { const h = el.getAttribute("href") || el.getAttribute("src") || ""; if(h.endsWith("#" + px.path)) el.setAttribute(el.tagName === "IMG" ? "src" : "href", u); });
-  if(typeof render === "function" && state) render();
-  const el = document.getElementById("pxTryNote");
-  if(el){ el.textContent = "In the park until you reload." + pxTryWhere(px.path); el.hidden = false; }
-  ui.toast("It's in the park.", "good");
-}
-// Which in-game state shows a building or prop picture, so a Try that seems to do nothing says why
-function pxTryWhere(path){
-  const m = path.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(front|back|left|right)(?:-(\d+|broken|full))?\.png$/), t = m && BUILDINGS[m[1]]; if(!t) return "";
-  const face = {front:"facing the bottom of the screen", back:"facing the top", left:"facing left", right:"facing right"}[m[2]];
-  const when = m[3] === "broken" ? "broken" : m[3] === "full" ? "full" : t.prop ? (m[1] === "bin" ? "working and not full" : "working") : "";
-  return ` This one shows on ${t.one || t.label}${t.prop ? ` ${face}` : ` seen from the ${m[2]}`}${when ? `, when it is ${when}` : ""}, in the Default theme. Place one and turn it to match.`;
-}
-const pxFirst = () => pxComp(0).toDataURL("image/png");
-// A plant's picture sets its ratio (a new one gets a stand-in PLANT_SPRITES entry); a rock shape is that biome's nth picture for its type
-function pxTryLand(){
-  const pl = px.path.match(/^sprites\/plants\/([a-z0-9-]+)\.png$/), rk = px.path.match(/^sprites\/rocks\/([a-z]+)-([a-z]+)-(\d+)\.png$/);
-  if(pl || rk){ const n = px.path.slice(px.path.lastIndexOf("/") + 1, -4), hit = pxHit(); if(hit){ SPRITE_HIT[n] = hit; hitBands.delete(n); } }   // the tap shape, until spritehit.py measures it for good
-  if(pl && LAND[pl[1]] && LAND[pl[1]].flora){ const S = PLANT_SPRITES[pl[1]] || (PLANT_SPRITES[pl[1]] = {size:1, tried:1}); S.ratio = px.fw / px.fh; }
-  if(rk && LAND[rk[1]] && BIOMES[rk[2]]){ const B = ROCK_SPRITES[rk[2]] || (ROCK_SPRITES[rk[2]] = {}), l = B[rk[1]] || (B[rk[1]] = []), i = +rk[3] - 1; if(i >= 0 && i <= l.length) l[i] = [px.fw, px.fh]; }
-}
-// The picture's SPRITE_HIT entry, measured like tools/spritehit.py: [width, height, base half-width, whole half-width, 4 px silhouette bands]
-function pxHit(){
-  const f = pxCompData(0), w = px.fw, h = px.fh, rows = [];
-  for(let y = 0; y < h; y++){ const r = []; for(let x = 0; x < w; x++) if(f[pxAt(x, y) + 3] > 20) r.push(x); rows.push(r); }
-  const ys = rows.map((r, y) => r.length ? y : -1).filter(y => y >= 0); if(!ys.length) return null;
-  const y0 = ys[0], y1 = ys[ys.length - 1] + 1, xs = rows.flat(), base = rows.slice(Math.max(y0, y1 - Math.max(2, Math.floor((y1 - y0) / 4))), y1).flat(), bands = [];
-  for(let by = 0; by < h; by += 4){ const bx = rows.slice(by, by + 4).flat(); bands.push(bx.length ? `${Math.min(...bx)}-${Math.max(...bx)}` : ""); }
-  while(bands.length && !bands[bands.length - 1]) bands.pop();
-  return [w, h, (Math.max(...base) - Math.min(...base) + 1) / 2, (Math.max(...xs) - Math.min(...xs) + 1) / 2, bands.join(",")];
-}
-// A building's view: a stand-in BLD_PICS entry for a type with no pictures, growing a view list as views are tried; a prop
-// borrows this view for the ones not drawn yet (and its broken state), since its drawing has no fallback. Genesis theme only, like the real ones.
-function pxTryBld(){
-  const m = px.path.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(front|back|left|right)(?:-(\d+|broken))?\.png$/), t = m && BUILDINGS[m[1]]; if(!t || PX_SKIP_BLD.includes(m[1])) return;
-  const k = m[1], v = m[2];
-  if(m[3] === "broken"){ if(PROP_PICS[k] && PROP_PICS[k].fake) PROP_PICS[k].fake = PROP_PICS[k].fake.filter(x => x !== px.path); return; }   // a drawn broken picture stops being stood in for
-  if(t.prop){
-    if(PROP_PICS[k] && !PROP_PICS[k].tried) return;
-    const P = PROP_PICS[k] || (PROP_PICS[k] = {tried:1}), png = pxFirst(); P[v] = [px.fw, px.fh, .5, px.guide != null ? px.guide : px.fh - 2]; (P.drawn = P.drawn || []).includes(v) || P.drawn.push(v);
-    P.fake = P.fake || [];
-    for(const w of PX_VIEWS){
-      if(!P.drawn.includes(w)){ P[w] = [px.fw, px.fh, .5, P[v][3]]; spriteUrl.swap(`sprites/bld/${k}-${w}.png`, png); }
-      const br = `sprites/bld/${k}-${w}-broken.png`; if(!SPRITE_PACK[br] || P.fake.includes(br)){ spriteUrl.swap(br, SPRITE_PACK[`sprites/bld/${k}-${w}.png`]); if(!P.fake.includes(br)) P.fake.push(br); }
-    }
-    return;
-  }
-  if(BLD_PICS[k] && !BLD_PICS[k].tried) return;
-  const B = BLD_PICS[k] || (BLD_PICS[k] = {w:px.fw, h:px.fh, base:px.guide != null ? px.guide : px.fh - 9, views:[], tried:1});
-  B.w = px.fw; B.h = px.fh; if(px.guide != null) B.base = px.guide; if(!B.views.includes(v)) B.views.push(v); if(m[3]) B.frames = Math.max(B.frames || 1, +m[3]);
-  if(!SPRITE_PACK[`sprites/bld/${k}-front.png`]) spriteUrl.swap(`sprites/bld/${k}-front.png`, pxFirst());   // views not drawn yet fall back to the front
-}
+/* ---------- repo ---------- */
 // Where a picture's base stands: a building's base row, a prop's third row from the bottom (two shadow rows under it)
 function pxGuideFor(p){
   const m = p.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(front|back|left|right)/), t = m && BUILDINGS[m[1]]; px.guideW = 0; if(!t) return null;
   px.guideW = (/left|right/.test(m[2]) ? t.d : t.w) / ROCK_MPP;   // sides show the turned footprint
   if(t.prop){ const P = PROP_PICS[m[1]]; return P && P[m[2]] && P[m[2]][3] != null ? P[m[2]][3] : px.fh - 2; }
-  const B = BLD_PICS[m[1]]; return B && !B.tried ? (/left|right/.test(m[2]) ? B.sideBase || B.base : B.base) : B ? B.base : px.fh - 9;
+  const B = BLD_PICS[m[1]]; return B ? (/left|right/.test(m[2]) ? B.sideBase || B.base : B.base) : px.fh - 9;
 }
 async function pxDb(){
   if(px.db) return px.db;
@@ -658,7 +593,7 @@ async function pxWatch(){
 async function pxSend(){
   if(!px.path) return;
   const why = pxEmptyWhy(); if(why) return ui.toast(why + " Nothing was sent.", "bad");
-  const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
+  const d = await pxDb(); if(!d) return ui.toast("Sending needs the editor open on claude.ai and you signed in. Download it instead.", "bad");
   const png = pxPng();
   try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, ...(pxFootDiff() ? {foot:pxFootDiff()} : {}), ...(pxBaseDiff() != null ? {base:pxBaseDiff()} : {}), ...(pxBoxDiff() ? {box:pxBoxDiff()} : {}), at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
   catch(e){ ui.toast("That didn't send (" + (e && e.code || "error") + ").", "bad"); }
@@ -698,7 +633,7 @@ function pxUnsent(){
   return out;
 }
 async function pxSendAll(){
-  const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
+  const d = await pxDb(); if(!d) return ui.toast("Sending needs the editor open on claude.ai and you signed in. Download it instead.", "bad");
   pxSaveDraft();
   const drafts = pxDrafts(), maybe = pxUnsent(), same = await Promise.all(maybe.map(p => pxSameNow(p, drafts[p]))), todo = maybe.filter((p, i) => !same[i]);
   if(!todo.length) return ui.toast("Nothing new to send: your drafts match the game's pictures.");
@@ -767,9 +702,20 @@ async function pxFromRigger(o, file){
   if(!px.path) px.path = "sprites/" + String(o.name || "critter").replace(/[^a-z0-9_-]/gi, "").toLowerCase() + ".png";
   pxFit(); pxChanged(); ui.toast(`Opened ${file}: ${px.layers.length} parts as layers. Send to rigger gives them back; Update parts there keeps the animation.`);
 }
+// Drafts saved from the game (its dev-mode Px button, from when the editor lived there): every key goes in, and a picture's draft only over an older one
+function pxTakeDrafts(o){
+  const have = pxDrafts(), got = o.drafts || {}; let n = 0;
+  for(const [p, at] of Object.entries(got)){
+    const dr = o.keys["genesis-pixel-d:" + p]; if(typeof dr !== "string" || (have[p] || 0) >= at) continue;
+    try{ localStorage.setItem("genesis-pixel-d:" + p, dr); have[p] = at; n++; }catch{ return ui.toast(`Storage is full after ${n} drafts.`, "bad"); }
+  }
+  pxStore("drafts", have); pxSync();
+  ui.toast(n ? `Took ${n} draft${n === 1 ? "" : "s"} from the game.` : "Every draft in that file is already here or older.", n ? "good" : "");
+  if(n && !px.frames.length) pxOverlay("open");
+}
 async function pxImport(file){
   if(/\.json$/i.test(file.name) || file.type === "application/json"){
-    try{ return await pxFromRigger(JSON.parse(await file.text()), file.name); }catch(e){ return ui.toast("That isn't a rigger project I can read (" + e.message + ").", "bad"); }
+    try{ const o = JSON.parse(await file.text()); return o && o.genesisPixelDrafts ? pxTakeDrafts(o) : await pxFromRigger(o, file.name); }catch(e){ return ui.toast("That isn't a rigger project I can read (" + e.message + ").", "bad"); }
   }
   try{
     const im = await pxImg(URL.createObjectURL(file));
@@ -798,7 +744,7 @@ function pxBuild(){
     <span class="pxsep"></span><button class="btn" data-px="copy" title="Copy the selection (Ctrl+C)">Copy</button><button class="btn" data-px="cut" title="Cut the selection (Ctrl+X)">Cut</button><button class="btn" data-px="paste" title="Paste (Ctrl+V): what you copied here, or a picture copied in another app">Paste</button><button class="btn" data-px="selall" title="Select the whole frame (Ctrl+A)">Select all</button>
     <span class="pxsep"></span><button class="btn" data-px="zout" title="Zoom out (-)">−</button><span class="num" id="pxZoom"></span><button class="btn" data-px="zin" title="Zoom in (+)">+</button><button class="btn" data-px="fit">Fit</button>
     <button class="btn" data-px="grid" title="Grid (#)">Grid</button><button class="btn" data-px="mirror" title="Draw mirrored left to right (Shift+M)">Mirror</button>
-    <span class="pxgrow"></span><button class="btn primary" data-px="save" title="Save the draft now (Ctrl+S)">Save</button><button class="btn" data-px="revert" title="Drop the draft and reload the game's copy">Revert</button><button class="btn" data-px="close">Close</button></div>
+    <span class="pxgrow"></span><button class="btn primary" data-px="save" title="Save the draft now (Ctrl+S)">Save</button><button class="btn" data-px="revert" title="Drop the draft and reload the game's copy">Revert</button></div>
   <div class="pxmain">
     <div class="pxtools">${PX_TOOLS.map(([k, n, key]) => `<button data-tool="${k}" title="${n} (${key})" aria-label="${n}">${pxIcon(k)}</button>`).join("")}
       <div class="pxsize" title="Pencil and eraser size"><small>Size</small>${[1, 2, 3].map(n => `<button data-size="${n}">${n}</button>`).join("")}</div></div>
@@ -829,10 +775,9 @@ function pxBuild(){
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
         <label class="pxrow" id="pxFootTog" hidden title="A building: drag the gold line's ends for its size, the line itself for its row. A plant or rock: drag the box's sides for its width, its top for its depth."><input type="checkbox" id="pxFootEdit"> Adjust footprint: drag the gold lines</label>
         <div class="meta" id="pxBoxNote" hidden></div>
-        <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view. With Adjust footprint on, drag its end handles to change the footprint (the depth on a side view) or the line to move its row; the park uses them at once, and they go with the picture when you send it.</div>
+        <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view. With Adjust footprint on, drag its end handles to change the footprint (the depth on a side view) or the line to move its row; they go with the picture when you send it.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
-      <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="sendall" id="pxSendAll" title="Send every picture you have changed and not sent yet">Send all drafts</button><button class="btn" data-px="download">Download</button></div>
-        <div class="meta" id="pxTryNote" hidden></div>
+      <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="sendall" id="pxSendAll" title="Send every picture you have changed and not sent yet">Send all drafts</button><button class="btn" data-px="download">Download</button></div>
         <div class="pxrow"><button class="btn" data-px="rigger" title="Save this frame's layers as parts for the sprite rigger">Send to rigger</button><span class="meta">A layer a part. Import a rigger project to get its parts back as layers.</span></div>
         <div id="pxQueue"></div></section>
     </div></div>
@@ -852,8 +797,9 @@ function pxBuild(){
     const f = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
     if(f){ clearTimeout(px.pasteT); e.preventDefault(); pxPasteImage(f.getAsFile()); }
   }); document.addEventListener("keyup", e => { if(e.key === " "){ px.space = false; pxStage.classList.remove("grab"); } });
-  D.addEventListener("cancel", e => { if(px.sel || !document.getElementById("pxOver").hidden){ e.preventDefault(); pxEsc(); } });
+  D.addEventListener("cancel", e => { e.preventDefault(); pxEsc(); });   // Escape drops the selection or the overlay, never the editor
   D.addEventListener("close", () => { pxDrop(); clearTimeout(pxSaveT); if(px.path && px.frames.length){ pxStore("d:" + px.path, pxDraft()); } });
+  addEventListener("pagehide", () => { if(pxSaveT) pxSaveDraft(); });   // leaving the page keeps a change still waiting to save
   px.built = true;
 }
 function pxSync(){
@@ -879,7 +825,7 @@ function pxSync(){
     cv.width = px.fw * s; cv.height = px.fh * s; const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; ctx.drawImage(pxComp(i), 0, 0, cv.width, cv.height);
   });
   pxLayersSync();
-  const refs = ["", ...(px.refUrl ? ["upload"] : []), ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
+  const refs = ["", ...(px.refUrl ? ["upload"] : []), ...Object.keys(SPRITES).filter(id => SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
   if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r === "upload" ? "Your picture" : r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
   $p("pxRef").value = px.ref; $p("pxRefEye").innerHTML = PX_EYE(px.refShow); $p("pxRefEye").setAttribute("aria-pressed", px.refShow);
   $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxRMove").checked = px.refMove; $p("pxRSize").value = Math.round(px.refK * 100); $p("pxRSizeN").textContent = Math.round(px.refK * 100) + "%"; $p("pxGuideNote").hidden = px.guide == null; { const b = pxBoxType(); $p("pxFootTog").hidden = !b && (px.guide == null || !pxFootType()); $p("pxBoxNote").hidden = !b; if(b){ const [w, d] = pxBoxDims(b); $p("pxBoxNote").textContent = `Footprint ${w} × ${d} m${FOOT.box[b.name] ? ", set by hand" : ""}`; } } $p("pxFootEdit").checked = !!px.footEdit;
@@ -889,7 +835,7 @@ function pxSync(){
   if(document.activeElement !== $p("pxN")) $p("pxN").value = px.frames.length;
   const un = pxUnsent().length; $p("pxSendAll").textContent = un > 1 ? `Send all drafts (${un})` : "Send all drafts";
   const q = $p("pxQueue");
-  q.innerHTML = !px.db ? `<div class="meta">Sending works when the game is open on claude.ai. Download works anywhere.</div>`
+  q.innerHTML = !px.db ? `<div class="meta">Sending works when the editor is open on claude.ai. Download works anywhere.</div>`
     : !px.queue.some(x => !x.pulled) ? `<div class="meta">Nothing waiting. Sent pictures wait here until Claude pulls them into the repo.</div>`
     : `<div class="meta">Waiting for the repo:</div><ul class="pxq">${px.queue.filter(x => !x.pulled).map(x => `<li><button class="linkish" data-openp="${esc(x.path)}">${esc(x.path)}</button><span class="meta"> ${new Date(x.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span><button class="btn" data-unsend="${esc(x.path)}" title="Take it off the list">×</button></li>`).join("")}</ul>`;
 }
@@ -904,7 +850,7 @@ function pxOverlay(kind, opt){
     const tpl = opt && opt.tpl || "animal", sp = opt && opt.sp || pxNeedArt()[0]?.id || SPECIES[0].id;
     o.innerHTML = `<div class="pxcard"><h2>New picture</h2>
       <label class="field"><span>What it is</span><select id="pxNt">${Object.entries(PX_TEMPLATES).map(([k, t]) => `<option value="${k}"${k === tpl ? " selected" : ""}>${esc(t[0])}</option>`).join("")}</select></label>
-      <label class="field" id="pxNsF"><span>Species</span><select id="pxNs">${pxSpeciesOrder().map(s => `<option value="${s.id}"${s.id === sp ? " selected" : ""}>${esc(s.name)} (${esc(s.period)})${SPRITES[s.id] && !SPRITES[s.id].tried ? ", has art" : ""}</option>`).join("")}</select></label>
+      <label class="field" id="pxNsF"><span>Species</span><select id="pxNs">${pxSpeciesOrder().map(s => `<option value="${s.id}"${s.id === sp ? " selected" : ""}>${esc(s.name)} (${esc(s.period)})${SPRITES[s.id] ? ", has art" : ""}</option>`).join("")}</select></label>
       <label class="field" id="pxNmF"><span>Name</span><input id="pxNm" value="${esc(opt && opt.name || "new")}" autocomplete="off"></label>
       <label class="field" id="pxNvF"><span>View</span><select id="pxNv">${PX_VIEWS.map(v => `<option${opt && opt.view === v ? " selected" : ""}>${v}</option>`).join("")}</select></label>
       <label class="field"><span>Path in the repo</span><input id="pxNp"></label>
@@ -947,9 +893,9 @@ function pxDrawn(cat){
 // What still has no picture, as entries for the new-picture form: species (dots), plants, buildings and props (drawn boxes), and one more shape for each biome's rocks
 function pxNeeds(cat){
   if(cat === "animal") return pxNeedArt().map(s => ({label:s.name, sub:s.period + (s.viv ? ", vivarium" : ""), note:LAUNCH_ROSTER.includes(s.id) ? "In the launch roster" : "", path:`sprites/${s.id}.png`, opt:{tpl:"animal", sp:s.id}}));
-  if(cat === "plant") return Object.keys(LAND).filter(k => LAND[k].flora && (!PLANT_SPRITES[k] || PLANT_SPRITES[k].tried))
+  if(cat === "plant") return Object.keys(LAND).filter(k => LAND[k].flora && !PLANT_SPRITES[k])
     .map(k => ({label:LAND[k].label, sub:k, note:"", path:`sprites/plants/${k}.png`, opt:{tpl:/small$/.test(k) ? "plantS" : /medium$/.test(k) ? "plantM" : "plant", name:k}}));
-  if(cat === "bld") return Object.entries(BUILDINGS).filter(([k, t]) => !PX_SKIP_BLD.includes(k) && (t.prop ? !PROP_PICS[k] || PROP_PICS[k].tried : !BLD_PICS[k] || BLD_PICS[k].tried)).map(([k, t]) => {
+  if(cat === "bld") return Object.entries(BUILDINGS).filter(([k, t]) => !PX_SKIP_BLD.includes(k) && (t.prop ? !PROP_PICS[k] : !BLD_PICS[k])).map(([k, t]) => {
     const c = Math.ceil(Math.max(t.w, t.d) / ROCK_MPP), w = t.prop ? c + 2 : c + 18 + c % 2, h = t.prop ? Math.round(w * 1.5) : w;
     return {label:t.label, sub:`${t.w} × ${t.d} m${t.prop ? ", a prop" : ""}`, note:"Four views: front, back, left, right", path:`sprites/bld/${k}-front.png`, opt:{tpl:t.prop ? "prop" : "bld", name:k, view:"front", w, h}};
   });
@@ -959,8 +905,8 @@ function pxNeeds(cat){
   }));
 }
 // Species still drawn as dots: the launch roster first, then by period
-const pxNeedArt = () => pxSpeciesOrder().filter(s => !SPRITES[s.id] || SPRITES[s.id].tried);
-const pxSpeciesOrder = () => SPECIES.slice().sort((a, b) => (!!SPRITES[a.id] && !SPRITES[a.id].tried) - (!!SPRITES[b.id] && !SPRITES[b.id].tried) || !LAUNCH_ROSTER.includes(a.id) - !LAUNCH_ROSTER.includes(b.id));
+const pxNeedArt = () => pxSpeciesOrder().filter(s => !SPRITES[s.id]);
+const pxSpeciesOrder = () => SPECIES.slice().sort((a, b) => !!SPRITES[a.id] - !!SPRITES[b.id] || !LAUNCH_ROSTER.includes(a.id) - !LAUNCH_ROSTER.includes(b.id));
 // The new-picture form: a template sets the size, frames and path; the size and path can still be typed over
 function pxNewFill(sized){
   const g = id => document.getElementById(id), t = PX_TEMPLATES[g("pxNt").value], animal = t[4].includes("{id}");
@@ -1098,14 +1044,14 @@ function pxClick(e){
     grid:() => { px.grid = !px.grid; pxDraw(); pxSync(); }, mirror:() => { px.mirror = !px.mirror; pxDraw(); pxSync(); },
     save:() => pxSaveNow(),
     revert:() => { if(!px.path || !SPRITE_PACK[px.path]) return ui.toast("This picture isn't in the game yet, so there's nothing to revert to."); const d = pxDrafts(); delete d[px.path]; pxStore("drafts", d); pxStore("d:" + px.path); pxOpen(px.path, true); },
-    close:() => document.getElementById("dlgPixel").close(), swap:() => { [px.c1, px.c2] = [px.c2, px.c1]; pxSync(); },
+    swap:() => { [px.c1, px.c2] = [px.c2, px.c1]; pxSync(); },
     ladd:() => pxLayerOp("add"), ldup:() => pxLayerOp("dup"), ldel:() => pxLayerOp("del"), lup:() => pxLayerOp("up"), ldown:() => pxLayerOp("down"), lmerge:() => pxLayerOp("merge"),
     fadd:() => pxFrameOp("add"), fdup:() => pxFrameOp("dup"), fdel:() => pxFrameOp("del"), fleft:() => pxFrameOp("left"), fright:() => pxFrameOp("right"),
     resize:() => pxResize(+document.getElementById("pxW").value, +document.getElementById("pxH").value, document.getElementById("pxAnchor").value),
     reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
     refup:() => document.getElementById("pxRefFile").click(), refeye:() => { px.refShow = !px.refShow; pxChanged(); }, refreset:() => { px.refX = px.refY = 0; px.refK = 1; pxChanged(); }, refmatch:pxRefMatch, reflayer:pxRefToLayer,
     copy:() => pxCopy(false), cut:() => pxCopy(true), paste:pxPasteButton, selall:pxSelectAll,
-    try:pxTry, send:pxSend, sendall:pxSendAll, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
+    send:pxSend, sendall:pxSendAll, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
 }
 function pxDbl(e){ const b = e.target.closest("[data-c]"); if(!b || b.dataset.c === "0,0,0,0") return; const r = document.getElementById("pxRe"); r.dataset.from = b.dataset.c; r.value = pxHex(b.dataset.c.split(",").map(Number)); r.click(); }
 function pxRight(e){ const b = e.target.closest("[data-c]"); if(!b) return; e.preventDefault(); px.c2 = b.dataset.c.split(",").map(Number); pxSync(); }
@@ -1181,4 +1127,4 @@ async function openPixelEditor(path){
   else if(!px.frames.length){ const last = pxStored("last"); if(last && (SPRITE_PACK[last] || pxStored("d:" + last))) await pxOpen(last); else pxOverlay("open"); }
   pxFit(); pxSync(); if(!px.anim) px.anim = requestAnimationFrame(pxPreview);
 }
-{ const b = document.getElementById("pixelBtn"); if(b){ b.hidden = !devMode(); b.onclick = () => openPixelEditor(); } }
+openPixelEditor();   // the whole page is the editor (pixeled.html)

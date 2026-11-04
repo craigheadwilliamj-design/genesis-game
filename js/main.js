@@ -188,6 +188,17 @@ function showStart(){
   const c = $("#startContinue"); c.hidden = !savedGame; if(savedGame) c.textContent = `Continue: ${savedGame.name}`;
   if(!$("#dlgStart").open) $("#dlgStart").showModal();
 }
+// The pixel editor is its own artifact now (pixeled.html), with its own storage: in dev mode, drafts left here from when it lived in the game save to a file its Import takes
+const pixelDraftKeys = () => { try{ return Object.keys(localStorage).filter(k => k.startsWith("genesis-pixel-")); }catch{ return []; } };
+function pixelDraftsBtn(){ const b = $("#pixelBtn"); if(b) b.hidden = !devMode() || !pixelDraftKeys().some(k => k.startsWith("genesis-pixel-d:")); }
+async function savePixelDrafts(){
+  const keys = Object.fromEntries(pixelDraftKeys().map(k => [k, localStorage.getItem(k)]));
+  let drafts = {}; try{ drafts = JSON.parse(keys["genesis-pixel-drafts"]) || {}; }catch{}
+  const blob = new Blob([JSON.stringify({genesisPixelDrafts:1, drafts, keys})], {type:"application/json"}), name = "pixel-drafts.json";
+  try{ const dl = window.claude && await window.claude.use("downloads"); if(dl){ await dl.save({filename:name, data:blob}); return; } }catch(e){ if(e && e.code !== "unavailable") return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+pixelDraftsBtn(); $("#pixelBtn").onclick = savePixelDrafts;
 // Click the version label 5 times in a row (each within 1.5 s of the last) to flip dev-mode.
 { let n = 0, last = 0;
   document.addEventListener("click", e => {
@@ -197,7 +208,7 @@ function showStart(){
     n = 0;
     const on = !devMode(); devFlag = on;
     try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
-    const px = $("#pixelBtn"); if(px) px.hidden = !on;   // the pixel editor's button shows at once
+    pixelDraftsBtn();
     buildMenu(); refreshMenu();   // dev-only entries like the tram track come and go
   });
 }
