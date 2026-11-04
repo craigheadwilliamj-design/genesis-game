@@ -27,6 +27,7 @@ export class World {
     this.bus = new Bus();
     this.bus.on("notify", n => this.note(n.text, n.urgent));
     this.bus.on("breakFence", ({ tile }) => { clearTile(this.state.grid, tile); this.changed(); });
+    this.bus.on("caught", ({ animal }) => this.caught(animal));
     this.changed();
   }
 
@@ -140,6 +141,20 @@ export class World {
     dropIn(this.state, this.derived, a);
     this.state.animals.push(a);
     return "";
+  }
+  // A darted animal goes back to its exhibit if that pen is closed again, otherwise into a crate.
+  caught(id) {
+    const a = this.state.animals.find(a => a.id === id);
+    if (!a) return;
+    a.escaped = false; a.path = []; a.act = "idle"; a.t = 0;
+    if (this.state.exhibits.some(e => e.id === a.home)) { a.ex = a.home; dropIn(this.state, this.derived, a); this.note(`${SPECIES[a.sp].name} is back in its exhibit.`); }
+    else { a.crated = true; a.ex = 0; this.note(`${SPECIES[a.sp].name} is in a crate.`); }
+  }
+  release(id, exId) {
+    const a = this.state.animals.find(a => a.id === id && a.crated);
+    if (!a) return "No such crate.";
+    if (!this.state.exhibits.some(e => e.id === exId)) return "Not in an exhibit.";
+    a.crated = false; a.ex = exId; dropIn(this.state, this.derived, a); return "";
   }
   hire(role) {
     if (!STAFF.hire[role]) return "No such job.";

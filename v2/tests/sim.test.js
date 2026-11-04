@@ -123,3 +123,38 @@ test("save and load round-trip", () => {
   assert.deepEqual(w2.derived.ex.get(e.id).tiles.length, w.derived.ex.get(e.id).tiles.length);
   w2.advance(100);
 });
+
+test("a guard darts an escaped animal: back home if the pen is closed again, else a crate", () => {
+  const { w, e } = buildPark("hedge");
+  w.setBiome(e.id, "desert");
+  w.buyAnimal("dime", e.id);
+  w.hire("guard");
+  for (let k = 0; k < 40 && !w.state.animals[0].escaped; k++) w.advance(60);
+  const a = w.state.animals[0];
+  assert.ok(a.escaped, "it got out");
+  for (let k = 0; k < 24 && a.escaped; k++) w.advance(30);
+  assert.ok(!a.escaped, "the guard caught it");
+  assert.ok(a.crated, "the pen is still open, so it's in a crate");
+  assert.ok(w.state.bell.some(n => /in a crate/.test(n.text)));
+  // Close the gap with concrete and release it.
+  const gap = []; const g = w.state.grid;
+  for (let i = 0; i < g.struct.length; i++) if (g.ex[i] === e.id && !w.derived.exOf[i] && g.struct[i] === 0) {
+    const x = i % g.w, y = (i / g.w) | 0;
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => w.derived.exOf[(y + dy) * g.w + x + dx] === 0 && g.ex[(y + dy) * g.w + x + dx] !== e.id)) gap.push([x, y]);
+  }
+  assert.equal(w.paint("fence:concrete", gap), "");
+  assert.ok(w.state.exhibits.some(x => x.id === e.id), "closing the gap brings the exhibit back");
+  assert.equal(w.release(a.id, e.id), "");
+  assert.ok(!a.crated && a.ex === e.id);
+});
+
+test("guests run from a loose predator", () => {
+  const { w, e } = buildPark("hedge");
+  w.setBiome(e.id, "desert");
+  w.buyAnimal("dime", e.id);
+  w.advance(200);
+  const a = w.state.animals[0];
+  a.escaped = true; a.ex = 0;
+  const gst = w.state.guests[0];
+  if (gst) { gst.x = a.x + 1; gst.y = a.y; w.advance(1); assert.ok(gst.panic, "a guest next to it panics"); }
+});

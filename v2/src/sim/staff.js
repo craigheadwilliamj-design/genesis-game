@@ -25,6 +25,8 @@ export function planJobs(state, derived) {
     for (const type of new Set(animalsIn(state, e.id).map(a => SPECIES[a.sp].foodType)))
       if ((e.food[type] || 0) < cap * 0.5) postJob(state, { key: `feed:${e.id}:${type}`, kind: "feed", role: "keeper", ex: e.id, type, pri: 2 });
   }
+  for (const a of state.animals) if (a.escaped && !a.crated)
+    postJob(state, { key: `catch:${a.id}`, kind: "catch", role: "guard", animal: a.id, pri: 5 });
   for (let i = 0; i < g.cond.length; i++)
     if (isFence(g, i) && g.cond[i] < COND.worn) postJob(state, { key: `fix:${i}`, kind: "repair", role: "mechanic", tile: i, pri: g.cond[i] < COND.damaged ? 3 : 1 });
 }
@@ -64,6 +66,12 @@ function goals(state, derived, s, job) {
     return state.buildings.filter(b => t.feeders.includes(b.id)).flatMap(b => besideBuilding(state, b)).filter(j => derived.exOf[j] === job.ex);
   }
   if (job.kind === "repair") return neighbours(g, job.tile).filter(j => walkable(g, j, "staff"));
+  if (job.kind === "catch") {
+    const a = state.animals.find(a => a.id === job.animal);
+    if (!a || !a.escaped) return [];
+    const i = tileOf(g, a);
+    return [i, ...neighbours(g, i)].filter(j => walkable(g, j, "staff"));
+  }
   return [];
 }
 
@@ -110,6 +118,13 @@ function arrive(state, derived, bus, s, job) {
     const e = state.exhibits.find(e => e.id === job.ex), t = derived.ex.get(job.ex);
     if (e && t) { const cap = t.feeders.length * FOOD.feederCap; e.food[job.type] = Math.min(cap, (e.food[job.type] || 0) + s.carry.n); }
     s.carry = null; s.job = 0; dropJob(state, job); return;
+  }
+  if (job.kind === "catch") {
+    const a = state.animals.find(a => a.id === job.animal);
+    if (!a || !a.escaped) { s.job = 0; dropJob(state, job); return; }
+    if (Math.hypot(a.x - s.x, a.y - s.y) > 1.6) return startStage(state, derived, s, job);   // it moved: follow
+    if (s.stage !== "dart") { s.stage = "dart"; s.t = STAFF.dartMin; a.act = "held"; a.t = STAFF.dartMin + 1; a.path = []; return; }
+    bus.emit("caught", { animal: a.id }); s.job = 0; dropJob(state, job); return;
   }
   if (job.kind === "repair") {
     if (s.stage === "go") { s.stage = "work"; s.t = 20; return; }

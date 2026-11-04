@@ -37,7 +37,7 @@ export class UI {
   buildTools() {
     const bar = $("tools");
     bar.innerHTML = TOOLS.map(([id, label]) => `<button data-tool="${id}" aria-pressed="${id === this.tool}">${esc(label)}</button>`).join("")
-      + `<span class="sep"></span><button data-hire="keeper">Hire Keeper</button><button data-hire="mechanic">Hire Mechanic</button><span id="why"></span>`;
+      + `<span class="sep"></span><button data-hire="keeper">Hire Keeper</button><button data-hire="mechanic">Hire Mechanic</button><button data-hire="guard">Hire Guard</button><span id="why"></span>`;
     bar.onclick = e => {
       const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.tool) { this.tool = b.dataset.tool; bar.querySelectorAll("[data-tool]").forEach(x => x.setAttribute("aria-pressed", x === b)); }
@@ -151,6 +151,7 @@ export class UI {
     side.onclick = ev => {
       const b = ev.target.closest("button"); if (!b) return;
       if (b.dataset.buy) this.say(w.buyAnimal(b.dataset.buy, Number(b.dataset.ex)));
+      if (b.dataset.release) this.say(w.release(Number(b.dataset.release), Number(b.dataset.ex)));
       if (b.dataset.close !== undefined) { this.selected = null; this.selectedEx = 0; }
       this.lastPanel = ""; this.panel();
     };
@@ -185,6 +186,7 @@ export class UI {
       <div>${chips.map(([c, k]) => `<span class="chip ${k}">${esc(c)}</span>`).join("")}</div>
       ${here.length ? `<h4>Animals</h4>` + here.map(a => `<div class="row"><span>${esc(SPECIES[a.sp].name)}</span><span class="meter"><i style="width:${a.happy}%"></i></span></div>`).join("") : ""}
       ${meters}
+      ${s.animals.some(a => a.crated) ? `<h4>Crates</h4>` + s.animals.filter(a => a.crated).map(a => `<div class="row"><span>${esc(SPECIES[a.sp].name)}</span><button data-release="${a.id}" data-ex="${e.id}">Release here</button></div>`).join("") : ""}
       <h4>Buy</h4>${Object.entries(SPECIES).map(([id, sp]) => `<div class="row"><span>${esc(sp.name)} <span class="muted">D${sp.danger}</span></span><button data-buy="${id}" data-ex="${e.id}" ${s.money < sp.price ? "disabled" : ""}>${fmtMoney(sp.price)}</button></div>`).join("")}`;
   }
   animalPanel(a) {

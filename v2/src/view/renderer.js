@@ -74,12 +74,12 @@ export function draw(ctx, world, cam, ui) {
 
   // Walkers, sorted by their feet so nearer ones draw on top.
   const walkers = [
-    ...state.animals.map(a => ({ k: "a", m: a })), ...state.staff.map(s => ({ k: "s", m: s })), ...state.guests.map(gst => ({ k: "g", m: gst })),
+    ...state.animals.filter(a => !a.crated).map(a => ({ k: "a", m: a })), ...state.staff.map(s => ({ k: "s", m: s })), ...state.guests.map(gst => ({ k: "g", m: gst })),
   ].sort((p, q) => p.m.y - q.m.y);
   for (const { k, m } of walkers) {
     const fx = Math.round((m.x * TILE - cam.x) * z), fy = Math.round((m.y * TILE - cam.y) * z);
     if (k === "a") drawAnimal(ctx, m, fx, fy, z, ui.selected === m);
-    else drawPerson(ctx, fx, fy, z, k === "s" ? (m.role === "keeper" ? "#3f6b3a" : "#4a5f86") : guestColor(m.id));
+    else drawPerson(ctx, fx, fy, z, k === "s" ? ({ keeper: "#3f6b3a", mechanic: "#4a5f86", guard: "#2f2f38" }[m.role] || "#555") : guestColor(m.id));
   }
 
   // Tool preview and hover.

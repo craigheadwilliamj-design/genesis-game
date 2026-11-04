@@ -110,6 +110,7 @@ function finish(state, derived, bus, a) {
 export function animalTick(state, derived, bus, dt) {
   const g = state.grid;
   for (const a of state.animals) {
+    if (a.crated) continue;
     const s = SPECIES[a.sp];
     a.need.hunger = Math.min(100, a.need.hunger + DRAIN.hunger * dt);
     if (s.moves !== "swim") a.need.thirst = Math.min(100, a.need.thirst + DRAIN.thirst * dt);
@@ -151,10 +152,11 @@ export function updateHappiness(state, derived) {
 export function settleAnimals(state, derived, bus) {
   const g = state.grid;
   for (const a of state.animals) {
+    if (a.crated) continue;
     const here = derived.exOf[tileOf(g, a)];
     if (!a.escaped && here !== a.ex) {
       if (here && state.exhibits.some(e => e.id === here)) { a.ex = here; continue; }
-      a.escaped = true; a.ex = 0; a.path = []; a.act = "idle"; a.t = 0;
+      a.home = a.ex; a.escaped = true; a.ex = 0; a.path = []; a.act = "idle"; a.t = 0;
       bus.emit("notify", { text: `${SPECIES[a.sp].name} has escaped!`, urgent: true });
     }
   }

@@ -41,6 +41,8 @@ export const FOOD = {
 };
 
 export const STAFF = {
-  wage: { keeper: 60, mechanic: 70 },   // a day
-  hire: { keeper: 500, mechanic: 600 },
+  wage: { keeper: 60, mechanic: 70, guard: 80 },   // a day
+  hire: { keeper: 500, mechanic: 600, guard: 700 },
+  dartMin: 8,            // minutes a guard takes to dart an escaped animal
+  panicTiles: 5,         // guests this close to a loose animal of danger 3 or more run for the exit
 };

@@ -1,6 +1,6 @@
 // Guests: arrive at the entrance, pay, walk the paths to exhibits they haven't seen, watch, eat, and leave.
 // Same utility idea as animals: a pressing need first, then the most appealing unseen exhibit, then home.
-import { SPEED, GUESTS, S_PATH } from "./config.js";
+import { SPEED, GUESTS, S_PATH, STAFF } from "./config.js";
 import { SPECIES, BUILDINGS } from "./data.js";
 import { neighbours, idx } from "./grid.js";
 import { route } from "./paths.js";
@@ -66,7 +66,13 @@ function decide(state, derived, gst) {
 export function guestTick(state, derived, bus, dt) {
   arrivals(state, derived, dt);
   const g = state.grid, gone = [];
+  const loose = state.animals.filter(a => a.escaped && SPECIES[a.sp].danger >= 3);
   for (const gst of state.guests) {
+    if (!gst.panic && loose.some(a => Math.hypot(a.x - gst.x, a.y - gst.y) < STAFF.panicTiles)) {
+      gst.panic = true; gst.until = 0; gst.t = 0;
+      const ent = state.buildings.find(b => b.type === "entrance");
+      gst.path = (ent && route(g, tileOf(g, gst), pathsBeside(state, ent), "guest")) || []; gst.plan = "leave";
+    }
     gst.hunger = Math.min(100, gst.hunger + dt * 100 / 300);
     if (!walk(g, gst, SPEED.guest, dt)) continue;
     if ((gst.t -= dt) > 0) continue;
@@ -84,7 +90,7 @@ export function guestTick(state, derived, bus, dt) {
 // A guest going home rates the visit: fun had against what the ticket cost.
 function leave(state, gst) {
   const worth = gst.fun / Math.max(10, state.ticket * 0.8);
-  const stars = Math.max(0.5, Math.min(5, 1 + worth * 2.5 - (gst.hunger > 80 ? 0.5 : 0)));
+  const stars = gst.panic ? 0.5 : Math.max(0.5, Math.min(5, 1 + worth * 2.5 - (gst.hunger > 80 ? 0.5 : 0)));
   state.rating = state.rating * 0.97 + stars * 0.03;
   state.books.today.visitors++;
   state.guests = state.guests.filter(x => x !== gst);

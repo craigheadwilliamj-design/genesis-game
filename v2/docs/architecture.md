@@ -22,9 +22,10 @@ Needs (hunger, thirst, rest) drain every step. When an action runs out, `choose`
 
 ## Staff and the job board (staff.js)
 `planJobs` (hourly) posts feed jobs for pens whose feeders are under half full, and repair jobs for Worn or Damaged fence tiles. Each job has a key so it's posted once. Idle staff claim the highest-priority job of their role they can route to. Feeding: fetch from the nearest stocked shed, then deliver at a feeder through a gate, or, for a pen holding danger 3 or more, from outside beside a chute (staff never walk into a dangerous pen). A job that can't be done gets a `why` ("No feeding chute.") and waits an hour.
+Guards take catch jobs, posted for every escaped animal: they follow it, dart it (`STAFF.dartMin`), and the world puts it back in its exhibit if that pen is closed again, or into a crate (`a.crated`, off the map) to be released into any exhibit from its panel.
 
 ## Guests (guests.js)
-Arrivals depend on rating, ticket price and how much the viewable exhibits draw. A guest pays the ticket, then: hungry -> a snack stand; otherwise the most appealing exhibit not seen yet (watch a few minutes, gain fun from its draw); out of time or exhibits -> back to the entrance, where they rate the visit and leave.
+Arrivals depend on rating, ticket price and how much the viewable exhibits draw. A guest pays the ticket, then: hungry -> a snack stand; otherwise the most appealing exhibit not seen yet (watch a few minutes, gain fun from its draw); out of time or exhibits -> back to the entrance, where they rate the visit and leave. A guest within `STAFF.panicTiles` of a loose animal of danger 3 or more runs for the exit and rates the visit half a star.
 
 ## Time (world.js)
 `advance(minutes)` runs fixed steps of `STEP_MIN`. Every hour: exhibits re-tallied, happiness, job planning. At `DAY_MIN` the night runs: wages, the nightly food delivery to each shed (yesterday's eating plus a margin, paid now), fence wear, the books.
@@ -36,4 +37,4 @@ JSON, grid layers as base64. `migrate()` fills in missing fields for older saves
 `renderer.js` draws ground (park turf or the exhibit's biome, with stable per-tile detail), water from the biome's ramp, paths, fences (top and front face, darker when worn), buildings, then walkers sorted by their feet. `display.js` holds the size curve (`displayPx(meters)`), the only place real size turns into pixels. `ui.js` builds the HUD once and updates numbers, handles tools (drag a box: paths and water fill it, fences outline it), and renders the exhibit and animal panels.
 
 ## Not built yet
-Power plants (power is one switch), plants and browsing, research, the Time Travel and Genetics Labs, security guards, morale and break rooms, attractions, weather, real art.
+Power plants (power is one switch), plants and browsing, research, the Time Travel and Genetics Labs, vandalism, morale and break rooms, attractions, weather, real art.
