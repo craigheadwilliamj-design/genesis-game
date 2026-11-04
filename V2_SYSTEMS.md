@@ -19,7 +19,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 ## 1. The grid
 - The map is W x H tiles of 16 px. Each tile holds a few layers, each stored as a flat typed array (fast to read, small to save):
   - **water:** none, shallow or deep. The only ground the player paints.
-  - **structure:** nothing, path, staff path, a fence (type, HP, flags for gate and window) or part of a building.
+  - **structure:** nothing, path, staff path, a fence (type, condition, flags for gate, window and chute) or part of a building.
   - **object:** a plant, a rock, a shelter or a prop, with its variant.
 - The map is flat for v2.0. There is no ground paint: outside the exhibits is **park ground**, a neutral texture of its own that belongs to no biome (mowed turf: a duller green than any biome, faint mowed stripes, packed-earth wear near paths and building fronts), and inside, the ground comes from the exhibit's biome.
 - Every edit goes through a command (`paint`, `place`, `remove`) and fires `tilesChanged(area)`. Nothing else writes to the grid.
@@ -35,12 +35,14 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 - It never decides anything. Species read it.
 
 ## 3. Species and animals
-- **A species file:** real size (for display, diet and danger), biomes it likes (preferred first, then acceptable), water wants (%, depth), space per animal (in tiles), group size min and max, social style (solo, herd, pack), diet (plant tags and browse height, or prey size), temperament (shy, calm, aggressive), strength (how hard it tests fences), movement kind, active hours, period, price and appeal.
+- **A species file:** real size (for display, diet and danger), biomes it likes (preferred first, then acceptable), water wants (%, depth), space per animal (in tiles), group size min and max, social style (solo, herd, pack), diet (plant tags and browse height, or prey size), temperament (shy, calm, aggressive), danger (1 to 3: the fence security it needs), movement kind, active hours, period, price and appeal.
 - **Habitat score:** the species compares its wants with the exhibit and gets one meter per need, plus an overall score. That's the panel. Biome: full marks if preferred, part if acceptable, poor otherwise.
 - **An animal:** needs (hunger, thirst, rest, social, comfort from the habitat score) that drain over time, plus health and stress.
 - **Behavior is a utility picker:** every few seconds each animal scores its possible actions by how much they'd fix its most urgent need, and does the best one: eat (a feeder, or browse a plant at its height), drink, rest (cover or a shelter), stay near its group, wander, show off. The same list serves every species; data switches extras on (herds flee together, packs move together, carnivores pace the fence).
 - **Happiness** comes from the needs and the habitat score. It drives appeal to guests, health, breeding later, and stress.
-- **Escapes:** a stressed, strong animal tests the fence tile in front of it and wears its HP down. Electric fences hurt while powered. A broken tile opens the region, the exhibit stops being closed, and an animal that walks out becomes escaped.
+- **Fence security:** every fence type has a security tier, 1 to 3 (hedge and palisade 1, stone and glass 2, concrete 3, electric 3 while powered and 1 when not; the aquarium and lagoon walls hold what they're built for). A pen's security is its weakest tile. Security at or above an animal's danger holds it, full stop.
+- **Wear:** each fence tile has a condition that drops slowly over time and faster where animals push on it. Good and Worn keep the full tier; Worn posts a repair job for mechanics. Only Damaged, after a long stretch of neglect, drops the tile one tier. Mechanics put it back to Good.
+- **Escapes are never instant:** an animal whose danger is above its pen's security tests the weakest tile, and the bell warns ("Tyrannosaurus is testing the fence.") while it does. Only after hours of testing does the tile break; the region opens and an animal that walks out is escaped. A power cut drops electric fences to tier 1 at once, which starts testing but still gives time to react.
 
 ## 4. The job board and staff
 - Systems never order staff around. They **post jobs**: "feed exhibit 3", "refill water", "repair fence at (40,12)", "pick up trash at (8,30)", "recapture animal 12". Each job has a role, a place, a priority and how long it takes.

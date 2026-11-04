@@ -7,7 +7,7 @@ A ground-up restart: same game, smaller and cleaner. v1 stays live as the playab
 - **Code:** sim split from drawing. The sim is plain data that ticks on its own and can be tested headless; the renderer only reads it. One module per system, talking through events, not reaching into each other. One versioned save format from day one.
 - **Grid:** 16 px tiles. A tile is a game unit, not a set number of meters. People are about 2 tiles tall (24 to 32 px).
 - **Size curve:** sprite size grows slower than real size. Small animals are drawn bigger and big ones smaller, but the order never flips (a small animal never looks bigger than a bigger one). The smallest have a floor size; swarm animals (trilobites, early fish) show as a cluster. The sim still uses real size for diet, danger and who eats whom; space needs are balance numbers in tiles.
-- **Fences:** a whole tile thick (Let's Build a Zoo style), painted like paths, auto-connecting, with a top and a short front face. Whatever is fully enclosed is an exhibit (flood fill). One fence tile between two pens is a wall for both. Gates and viewing windows are fence tiles with a flag. Each tile has strength and HP; a broken tile opens the pen.
+- **Fences:** a whole tile thick (Let's Build a Zoo style), painted like paths, auto-connecting, with a top and a short front face. Whatever is fully enclosed is an exhibit (flood fill). One fence tile between two pens is a wall for both. Gates and viewing windows are fence tiles with a flag. Security is in tiers (1 to 3) against each species' danger (1 to 3); see `V2_SYSTEMS.md`.
 - **Fence types (8):** six for land (hedge, log palisade, stone, concrete, electric (strong only while powered), glass viewing wall) and two that hold sea water: the aquarium wall (shallow sea, small sea animals, research at 2 stars) and the lagoon wall (deep sea, big marine animals, deep research). Themes are looks, not new types. The first animals you can get are land animals.
 - **Exhibits:** you don't place an exhibit, you get one by closing a fence, then you pick its biome. Ground isn't paintable: each biome has one varied fill. The exhibit tracks its tiles, water, plants, rocks and gates. Each species scores it per need (biome, space, water, plants, cover, group size) as meters.
 - **Water is the only paintable ground:** shallow and deep tiles painted inside a pen. One water tile set, recolored to each biome's water ramp. Species need a share of water (0%, 50%, 100% deep...). A tile can block walkers and let swimmers through, which also makes moats possible. A glass wall beside deep water is the aquarium. No separate vivarium or aquarium system.
@@ -54,7 +54,7 @@ Every asset passes an automatic check (palette, scale, transparency, parts with 
 
 ### 3. Core systems
 - The species data format and suitability scoring. Plant tags.
-- All 8 fence types, fence strength, escapes, and power for electric.
+- All 8 fence types, security tiers, wear, escapes, and power for electric.
 - Shallow and deep water, swimmers and amphibians.
 - Guest basics (food, drink, restrooms), custodians, the first buildings (testing the building pipeline).
 - The display size curve applied to the whole roster.
