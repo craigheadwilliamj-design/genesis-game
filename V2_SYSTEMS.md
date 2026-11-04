@@ -31,7 +31,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 ## 2. Exhibits
 - An exhibit is a region record, rebuilt when its tiles change. It keeps its id across edits by matching the most overlap with its old tiles, so its name and animals stay put.
 - It has one **biome**, set by the player after it closes (bare dirt until then). Merging two exhibits keeps the bigger one's biome; splitting one keeps it on both halves. Changing it later costs money and is instant.
-- It tallies: tile count, shallow and deep water, plant tags (food by group and height, cover), shelters, keeper gates, feeders, and **viewing spots** (path tiles next to a fence a guest can see through, with how well, by fence type).
+- It tallies: tile count, shallow and deep water, plant tags (food by group and height, cover), shelters, keeper gates, feeders, and **viewing spots** (path tiles next to a see-through fence tile). Every fence is see-through except concrete; a pen with no viewing spot can't be watched.
 - It never decides anything. Species read it.
 
 ## 3. Species and animals
@@ -67,7 +67,7 @@ One hop, no supply chain. The only food decisions are where the sheds go and how
 - **Needs:** hunger, thirst, bladder, energy, fun. Money in pocket.
 - **Wants:** a short list of species they came to see, weighted by appeal (the headline animals).
 - **Behavior is the same utility picker:** a pressing need sends them to the nearest service. Otherwise they head to the most appealing viewing spot they haven't used yet, and they leave when they're tired, broke or done.
-- **Watching:** a guest at a viewing spot gains fun from what's actually visible (animals close to that edge, how happy they are, appeal, the fence's visibility). That's what makes where you put glass matter.
+- **Watching:** a guest at a viewing spot gains fun from the exhibit as a whole: its animals' appeal and how happy they are. Where the animals stand doesn't matter.
 - **Money:** ticket at the gate, spending at shops. Shops just work: always stocked, with a cost per sale. No restocking. Litter becomes custodian jobs.
 - **Rating:** satisfaction on the way out feeds the park rating, and the rating feeds arrivals.
 - **Fear:** an escaped animal nearby makes guests run for the exit and drops the rating.
