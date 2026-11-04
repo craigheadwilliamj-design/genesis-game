@@ -52,7 +52,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 
 ## 5. Food
 One hop, no supply chain. The only food decisions are where the sheds go and how many keepers you have; everything else runs itself.
-- **Food sheds** are buildings you place. A delivery fills them every night, sized to what the park ate the day before, and paid that night. No orders, no stock screens.
+- **Food sheds** are buildings you place. Each one holds all four food types; themes change only its look. A delivery fills them every night, sized to what the park ate the day before, and paid that night. No orders, no stock screens.
 - **Feeders** sit inside a pen. Keepers fill them from the nearest shed that has the food, so a pen far from any shed gets slower refills.
 - **Food types (4):** greens, meat, fish, bugs. A species eats one or two.
 - **Upgrades, not new chains:** paleoflora from the Botany Lab (a happiness bonus for herbivores of that period) and whole carcasses for big carnivores (costs more, counts as enrichment, guests watch).
