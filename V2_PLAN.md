@@ -75,7 +75,7 @@ Every asset passes an automatic check (palette, scale, transparency, parts with 
 ## Open questions
 - Medicine (vets, illness, genome therapy) is on the back burner until after v2.0.
 - Where v2 lives: a new repo or a `v2/` folder.
-- Coming back: security, staff morale with break rooms, the museum (one building). Themes later. Still open: hotels, the tram.
+- Coming back: security, staff morale with break rooms, attractions (the museum plus flat rides). Themes later. Not for now: hotels, the tram, tour rides.
 - Do hills, cliffs and moats count as terrain height, or is the ground flat?
 - The exact size-curve numbers and the largest target park size.
 - Whether buildings come from Blender or shape generators (test on the restroom).

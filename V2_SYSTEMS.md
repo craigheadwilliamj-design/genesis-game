@@ -73,7 +73,8 @@ One hop, no supply chain. The only food decisions are where the sheds go and how
 - **Money:** ticket at the gate, spending at shops. Shops just work: always stocked, with a cost per sale. No restocking. Litter becomes custodian jobs.
 - **Rating:** satisfaction on the way out feeds the park rating, and the rating feeds arrivals.
 - **Fear:** an escaped animal nearby makes guests run for the exit and drops the rating.
-- **Museum:** one building, no modules. Its appeal grows with the events (Cambrian Explosion, Great Dying, K-Pg Impact...) recorded by Time Travel Lab expeditions to their sites.
+- **Attractions:** buildings with a queue, a capacity, a ride time, a ticket price you set, an appeal that feeds guest fun, upkeep, and breakdowns that post mechanic jobs. Flat rides only for v2.0 (fossil dig pit, dino carousel, 4D theater, a drop ride...), unlocked on the Guests research track. Tour rides that pass the pens come later.
+- **Museum:** an attraction, one building with no modules. Its appeal grows with the events (Cambrian Explosion, Great Dying, K-Pg Impact...) recorded by Time Travel Lab expeditions to their sites.
 - **Thoughts:** short lines for the guest panel ("This T. rex is amazing.", "Too expensive.").
 
 ## 7. Getting animals and plants
